@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-900 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Control de Salidas Tempranas</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            touch-action: manipulation;
+        }
+        /* Custom scrollbar para la tabla en móviles */
+        .tabla-container::-webkit-scrollbar {
+            height: 6px;
+        }
+        .tabla-container::-webkit-scrollbar-thumb {
+            background-color: #475569;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen bg-slate-900 text-slate-100 antialiased pb-10">
+
+    <header class="bg-slate-800 border-b border-slate-700/80 sticky top-0 z-30 shadow-lg">
+        <div class="max-w-md mx-auto px-4 py-3 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <h1 class="text-lg font-bold text-indigo-400 flex items-center gap-2">
+                    <span>⏱️</span> Salidas Tempranas
+                </h1>
+                <span class="text-[10px] bg-indigo-950 text-indigo-300 border border-indigo-700/50 px-2 py-0.5 rounded-full font-mono">PWA App</span>
+            </div>
+            
+            <!-- Navegación por pestañas móvil -->
+            <nav class="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+                <button id="nav-cargar" onclick="switchTab('cargar')" class="py-2.5 rounded-lg text-center transition-all bg-indigo-600 text-white shadow font-bold">
+                    Cargar Hoy
+                </button>
+                <button id="nav-tabla" onclick="switchTab('tabla')" class="py-2.5 rounded-lg text-center transition-all text-slate-400 hover:text-slate-200">
+                    Tabla
+                </button>
+                <button id="nav-grafico" onclick="switchTab('grafico')" class="py-2.5 rounded-lg text-center transition-all text-slate-400 hover:text-slate-200">
+                    Gráfico
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <div id="custom-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-xs w-full p-5 shadow-2xl text-center transform transition-all">
+            <div id="modal-icon" class="text-3xl mb-2">💡</div>
+            <h3 id="modal-title" class="text-base font-bold text-white mb-2">Aviso</h3>
+            <p id="modal-message" class="text-xs text-slate-300 mb-5 leading-relaxed"></p>
+            <div id="modal-buttons" class="flex justify-center gap-3">
+                <button id="modal-btn-cancel" onclick="closeModal()" class="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-slate-700 text-slate-200 hover:bg-slate-600 active:scale-95 transition-all">
+                    Cancelar
+                </button>
+                <button id="modal-btn-ok" class="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-500 active:scale-95 transition-all">
+                    Aceptar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-grow max-w-md w-full mx-auto p-4 space-y-4">
+
+        <!-- PESTAÑA 1: CARGAR REGISTRO DIARIO -->
+        <section id="sec-cargar" class="space-y-4">
+            <div class="bg-slate-800 border border-slate-700/70 rounded-2xl p-4 shadow-md space-y-4">
+                
+                <!-- Selector de Fecha -->
+                <div class="flex items-center justify-between bg-slate-900/80 p-3 rounded-xl border border-slate-700/50">
+                    <div class="flex flex-col">
+                        <span class="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Fecha del Registro</span>
+                        <span id="fecha-label-sub" class="text-xs text-slate-400">Hoy</span>
+                    </div>
+                    <input type="date" id="input-fecha" class="bg-slate-800 border border-slate-600 text-white text-xs font-bold rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <!-- Lista con casillas táctiles para el personal -->
+                <div>
+                    <div class="flex justify-between items-center mb-2 px-1">
+                        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Marcar salida temprana:</span>
+                        <span class="text-[11px] text-slate-400" id="contador-seleccionados">0 marcados</span>
+                    </div>
+
+                    <div id="grid-personal" class="grid grid-cols-1 gap-2.5">
+                        <!-- Inyectado dinámicamente con JS -->
+                    </div>
+                </div>
+
+                <!-- Botón de guardar -->
+                <button onclick="guardarRegistroDiario()" class="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-indigo-950/50 transition-all text-sm flex items-center justify-center gap-2 active:scale-[0.98]">
+                    <span>💾</span> Guardar Selección del Día
+                </button>
+
+                <!-- Botón para limpiar ÚNICAMENTE la fecha seleccionada -->
+                <button onclick="limpiarFechaSeleccionada()" class="w-full bg-slate-700/60 hover:bg-rose-900/40 text-rose-300 border border-slate-600/50 hover:border-rose-700/50 font-semibold py-2.5 px-4 rounded-xl transition-all text-xs flex items-center justify-center gap-2 active:scale-[0.98]">
+                    <span>🧹</span> Limpiar registros de esta fecha
+                </button>
+            </div>
+
+            <!-- Botones de respaldo (Exportar/Importar JSON) -->
+            <div class="bg-slate-800/80 border border-slate-700/50 rounded-2xl p-3.5 space-y-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block px-1">Copia de Seguridad</span>
+                
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="exportarRespaldo()" class="py-2.5 px-3 bg-slate-700/60 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-2 border border-slate-600/40">
+                        <span>📥</span> Exportar JSON
+                    </button>
+                    <label class="py-2.5 px-3 bg-slate-700/60 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-medium transition-all flex items-center justify-center gap-2 cursor-pointer border border-slate-600/40">
+                        <span>📤</span> Importar JSON
+                        <input type="file" id="file-import" accept=".json" onchange="importarRespaldo(event)" class="hidden">
+                    </label>
+                </div>
+            </div>
+        </section>
+
+        <!-- PESTAÑA 2: TABLA MENSUAL -->
+        <section id="sec-tabla" class="space-y-4 hidden">
+            <div class="bg-slate-800 border border-slate-700/70 rounded-2xl p-4 shadow-md space-y-3">
+                
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                        <span>📊</span> Matriz Mensual
+                    </h2>
+                    <select id="select-mes-tabla" onchange="renderizarTablaMensual()" class="bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none">
+                        <!-- Inyectado JS -->
+                    </select>
+                </div>
+
+                <!-- Tabla estilo Excel scrollable -->
+                <div class="tabla-container overflow-x-auto border border-slate-700/80 rounded-xl bg-slate-900">
+                    <table class="w-full text-center border-collapse text-xs">
+                        <thead id="head-tabla-mensual" class="bg-slate-950 text-slate-300 font-bold border-b border-slate-700">
+                            <!-- Inyectado JS -->
+                        </thead>
+                        <tbody id="body-tabla-mensual" class="divide-y divide-slate-800 font-medium text-slate-300">
+                            <!-- Inyectado JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <p class="text-[11px] text-slate-400 text-center italic">Desliza horizontalmente la tabla para ver todos los días del mes.</p>
+            </div>
+        </section>
+
+        <!-- PESTAÑA 3: GRAFICO MENSUAL -->
+        <section id="sec-grafico" class="space-y-4 hidden">
+            <div class="bg-slate-800 border border-slate-700/70 rounded-2xl p-4 shadow-md space-y-3">
+                
+                <div class="flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-slate-200 flex items-center gap-1.5">
+                        <span>📈</span> Resumen en Gráfico
+                    </h2>
+                    <select id="select-mes-grafico" onchange="renderizarGraficoMensual()" class="bg-slate-900 border border-slate-700 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 focus:ring-1 focus:ring-indigo-500 outline-none">
+                        <!-- Inyectado JS -->
+                    </select>
+                </div>
+
+                <!-- Canvas para Chart.js -->
+                <div class="relative h-72 w-full pt-2">
+                    <canvas id="chartSalidas"></canvas>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Personal exacto solicitado (8 personas)
+        const PERSONAL = [
+            "Esperanza", 
+            "Agatha", 
+            "Romina", 
+            "Cintia", 
+            "Kathy", 
+            "Ana", 
+            "Eli", 
+            "Laura"
+        ];
+
+        // Mapeo de colores distintivos para las barras y tarjetas
+        const COLORES_PERSONAL = {
+            "Esperanza": "#facc15", // Amarillo
+            "Agatha": "#3b82f6",    // Azul
+            "Romina": "#c084fc",    // Violeta
+            "Cintia": "#f97316",    // Naranja
+            "Kathy": "#94a3b8",    // Gris
+            "Ana": "#84cc16",      // Verde
+            "Eli": "#eab308",      // Dorado
+            "Laura": "#ef4444"     // Rojo
+        };
+
+        const STORAGE_KEY = 'salidas_tempranas_pwa_db';
+        let chartInstance = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // Detección automática del día actual
+            const hoy = new Date().toISOString().split('T')[0];
+            const inputFecha = document.getElementById('input-fecha');
+            inputFecha.value = hoy;
+
+            renderizarTarjetasPersonal();
+            poblarSelectoresMeses();
+            cargarSeleccionDelDia();
+
+            inputFecha.addEventListener('change', () => {
+                const esHoy = inputFecha.value === new Date().toISOString().split('T')[0];
+                document.getElementById('fecha-label-sub').innerText = esHoy ? 'Hoy' : inputFecha.value;
+                cargarSeleccionDelDia();
+            });
+        });
+
+        function getDB() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                return data ? JSON.parse(data) : {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function saveDB(db) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+        }
+
+        function switchTab(tab) {
+            const tabs = ['cargar', 'tabla', 'grafico'];
+            tabs.forEach(t => {
+                const sec = document.getElementById(`sec-${t}`);
+                const nav = document.getElementById(`nav-${t}`);
+                if (t === tab) {
+                    sec.classList.remove('hidden');
+                    nav.className = "py-2.5 rounded-lg text-center transition-all bg-indigo-600 text-white shadow font-bold";
+                } else {
+                    sec.classList.add('hidden');
+                    nav.className = "py-2.5 rounded-lg text-center transition-all text-slate-400 hover:text-slate-200";
+                }
+            });
+
+            if (tab === 'tabla') renderizarTablaMensual();
+            if (tab === 'grafico') renderizarGraficoMensual();
+        }
+
+        function renderizarTarjetasPersonal() {
+            const container = document.getElementById('grid-personal');
+            container.innerHTML = PERSONAL.map(nombre => `
+                <label class="item-persona flex items-center justify-between p-3.5 rounded-xl border border-slate-700/80 bg-slate-900/60 hover:bg-slate-900 active:bg-indigo-950/40 cursor-pointer transition-all select-none">
+                    <span class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full inline-block" style="background-color: ${COLORES_PERSONAL[nombre]}"></span>
+                        ${nombre}
+                    </span>
+                    <input type="checkbox" value="${nombre}" onchange="actualizarContador()" class="checkbox-persona w-5 h-5 rounded border-slate-600 text-indigo-600 focus:ring-indigo-500 bg-slate-800 accent-indigo-600">
+                </label>
+            `).join('');
+        }
+
+        function actualizarContador() {
+            const marcados = document.querySelectorAll('.checkbox-persona:checked').length;
+            document.getElementById('contador-seleccionados').innerText = `${marcados} marcado${marcados !== 1 ? 's' : ''}`;
+        }
+
+        function cargarSeleccionDelDia() {
+            const fecha = document.getElementById('input-fecha').value;
+            const db = getDB();
+            const marcados = db[fecha] || [];
+
+            document.querySelectorAll('.checkbox-persona').forEach(cb => {
+                cb.checked = marcados.includes(cb.value);
+            });
+            actualizarContador();
+        }
+
+        function guardarRegistroDiario() {
+            const fecha = document.getElementById('input-fecha').value;
+            if (!fecha) {
+                mostrarModal('Aviso', 'Por favor seleccioná una fecha válida.', false);
+                return;
+            }
+
+            const seleccionados = Array.from(document.querySelectorAll('.checkbox-persona:checked')).map(cb => cb.value);
+            const db = getDB();
+
+            if (seleccionados.length === 0) {
+                delete db[fecha];
+            } else {
+                db[fecha] = seleccionados;
+            }
+
+            saveDB(db);
+            mostrarModal('¡Guardado!', `Se guardaron las salidas de la fecha ${fecha} correctamente.`, false);
+        }
+
+        function limpiarFechaSeleccionada() {
+            const fecha = document.getElementById('input-fecha').value;
+            if (!fecha) return;
+
+            const db = getDB();
+            if (!db[fecha] || db[fecha].length === 0) {
+                mostrarModal('Sin registros', `La fecha ${fecha} ya se encuentra vacía.`, false);
+                return;
+            }
+
+            mostrarModal(
+                'Limpiar Fecha', 
+                `¿Deseas borrar los registros de salidas cargados para el día ${fecha}? El resto de los días no se modificarán.`, 
+                true, 
+                () => {
+                    delete db[fecha];
+                    saveDB(db);
+                    cargarSeleccionDelDia();
+                    mostrarModal('Fecha limpia', `Se han borrado los datos del día ${fecha}.`, false);
+                }
+            );
+        }
+
+        function poblarSelectoresMeses() {
+            const selectTabla = document.getElementById('select-mes-tabla');
+            const selectGrafico = document.getElementById('select-mes-grafico');
+            
+            const hoy = new Date();
+            const anioActual = hoy.getFullYear();
+            const mesActual = hoy.getMonth();
+
+            const mesesNombres = [
+                "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
+                "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+            ];
+
+            let options = '';
+            for (let i = -3; i <= 3; i++) {
+                const d = new Date(anioActual, mesActual + i, 1);
+                const m = d.getMonth();
+                const y = d.getFullYear();
+                const val = `${y}-${String(m + 1).padStart(2, '0')}`;
+                const sel = (i === 0) ? 'selected' : '';
+                options += `<option value="${val}" ${sel}>${mesesNombres[m]} ${y}</option>`;
+            }
+
+            selectTabla.innerHTML = options;
+            selectGrafico.innerHTML = options;
+        }
+
+        function renderizarTablaMensual() {
+            const valMes = document.getElementById('select-mes-tabla').value;
+            if (!valMes) return;
+
+            const [anio, mes] = valMes.split('-').map(Number);
+            const diasEnMes = new Date(anio, mes, 0).getDate();
+            const db = getDB();
+
+            const diasSemanaAbrev = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+            // Encabezado de la tabla
+            let htmlHead = `<tr><th class="p-2 border-r border-slate-700 bg-slate-950 text-left min-w-[90px] sticky left-0 z-10 shadow-r">Nombre</th>`;
+            
+            for (let d = 1; d <= diasEnMes; d++) {
+                const fechaObj = new Date(anio, mes - 1, d);
+                const diaSemana = diasSemanaAbrev[fechaObj.getDay()];
+                htmlHead += `<th class="p-1.5 border-r border-slate-800 text-[10px] min-w-[38px]">${diaSemana}<br><span class="text-xs font-bold text-indigo-400">${d}</span></th>`;
+            }
+            htmlHead += `<th class="p-2 bg-indigo-950 text-indigo-200 font-bold min-w-[50px]">Total</th></tr>`;
+            document.getElementById('head-tabla-mensual').innerHTML = htmlHead;
+
+            // Cuerpo de la matriz
+            let htmlBody = '';
+            PERSONAL.forEach(nombre => {
+                let totalPersona = 0;
+                let filaHtml = `<tr><td class="p-2 border-r border-slate-700 font-semibold text-slate-200 text-left sticky left-0 bg-slate-900 z-10 shadow-r">${nombre}</td>`;
+
+                for (let d = 1; d <= diasEnMes; d++) {
+                    const diaStr = String(d).padStart(2, '0');
+                    const fechaKey = `${valMes}-${diaStr}`;
+                    const marcados = db[fechaKey] || [];
+                    const estuvoTemprano = marcados.includes(nombre);
+
+                    if (estuvoTemprano) {
+                        totalPersona++;
+                        filaHtml += `<td class="p-1.5 border-r border-slate-800 bg-indigo-900/40 text-indigo-300 font-bold">1</td>`;
+                    } else {
+                        filaHtml += `<td class="p-1.5 border-r border-slate-800 text-slate-600">-</td>`;
+                    }
+                }
+
+                filaHtml += `<td class="p-2 font-bold bg-slate-950 text-indigo-400 border-l border-slate-800">${totalPersona}</td></tr>`;
+                htmlBody += filaHtml;
+            });
+
+            document.getElementById('body-tabla-mensual').innerHTML = htmlBody;
+        }
+
+        function renderizarGraficoMensual() {
+            const valMes = document.getElementById('select-mes-grafico').value;
+            if (!valMes) return;
+
+            const db = getDB();
+            const totales = {};
+            PERSONAL.forEach(p => totales[p] = 0);
+
+            Object.keys(db).forEach(fecha => {
+                if (fecha.startsWith(valMes)) {
+                    db[fecha].forEach(persona => {
+                        if (totales[persona] !== undefined) {
+                            totales[persona]++;
+                        }
+                    });
+                }
+            });
+
+            const labels = PERSONAL;
+            const dataValues = PERSONAL.map(p => totales[p]);
+            const backgroundColors = PERSONAL.map(p => COLORES_PERSONAL[p]);
+
+            const ctx = document.getElementById('chartSalidas').getContext('2d');
+
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Salidas Tempranas',
+                        data: dataValues,
+                        backgroundColor: backgroundColors,
+                        borderRadius: 8,
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, color: '#94a3b8' },
+                            grid: { color: '#334155' }
+                        },
+                        x: {
+                            ticks: { color: '#cbd5e1', font: { size: 10 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        function exportarRespaldo() {
+            const db = getDB();
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `respaldo_salidas_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importarRespaldo(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedDB = JSON.parse(e.target.result);
+                    saveDB(importedDB);
+                    cargarSeleccionDelDia();
+                    mostrarModal('Importación Exitosa', 'Los datos del respaldo han sido cargados correctamente.', false);
+                } catch(err) {
+                    mostrarModal('Error', 'El archivo subido no es un JSON de respaldo válido.', false);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        /* Modal Helper */
+        function mostrarModal(titulo, mensaje, esConfirmacion, onConfirm = null) {
+            document.getElementById('modal-title').innerText = titulo;
+            document.getElementById('modal-message').innerText = mensaje;
+            const modal = document.getElementById('custom-modal');
+            const btnOk = document.getElementById('modal-btn-ok');
+            const btnCancel = document.getElementById('modal-btn-cancel');
+
+            if (esConfirmacion) {
+                btnCancel.classList.remove('hidden');
+                btnOk.onclick = () => {
+                    closeModal();
+                    if (onConfirm) onConfirm();
+                };
+            } else {
+                btnCancel.classList.add('hidden');
+                btnOk.onclick = closeModal;
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('custom-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
